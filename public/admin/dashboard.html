@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard — NaijaMart</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+<div class="admin-shell">
+  <aside class="admin-sidebar">
+    <div class="brand">Naija<span class="mart">Mart</span> Admin</div>
+    <nav class="admin-nav">
+      <a href="/admin/dashboard.html" data-page="dashboard">Dashboard</a>
+      <a href="/admin/products.html" data-page="products">Products</a>
+      <a href="/admin/inventory.html" data-page="inventory">Inventory</a>
+      <a href="/admin/orders.html" data-page="orders">Orders</a>
+      <a href="/index.html" data-page="">View storefront</a>
+    </nav>
+    <div class="admin-sidebar-foot">
+      Signed in as <span id="admin-user-name">Admin</span><br>
+      <a href="#" id="admin-logout">Log out</a>
+    </div>
+  </aside>
+
+  <div class="admin-main">
+    <div class="admin-topbar"><h2 style="margin:0;">Dashboard</h2></div>
+    <div class="admin-content" id="dashboard-content">
+      <div class="spinner"></div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/admin.js"></script>
+<script>
+async function loadDashboard() {
+  if (!initAdminLayout('dashboard')) return;
+  const content = document.getElementById('dashboard-content');
+
+  try {
+    const data = await api.get('/admin/dashboard');
+    content.innerHTML = `
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">Total revenue</div><div class="stat-value">${formatNaira(data.totalRevenue)}</div></div>
+        <div class="stat-card"><div class="stat-label">Total orders</div><div class="stat-value">${data.totalOrders}</div></div>
+        <div class="stat-card"><div class="stat-label">Orders in progress</div><div class="stat-value">${data.pendingOrders}</div></div>
+        <div class="stat-card"><div class="stat-label">Customers</div><div class="stat-value">${data.totalCustomers}</div></div>
+        <div class="stat-card"><div class="stat-label">Active products</div><div class="stat-value">${data.totalProducts}</div></div>
+        <div class="stat-card ${data.lowStockCount > 0 ? 'warn' : ''}"><div class="stat-label">Low stock alerts</div><div class="stat-value">${data.lowStockCount}</div></div>
+      </div>
+
+      <div class="two-col">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Order</th><th>Customer</th><th>Total</th><th>Status</th><th>Date</th></tr></thead>
+            <tbody>
+              ${data.recentOrders.map(o => `
+                <tr>
+                  <td>#${o.id}</td>
+                  <td>${escapeHtml(o.customer_name)}</td>
+                  <td class="price">${o.total_amount.toLocaleString('en-NG')}</td>
+                  <td><span class="badge badge-${o.status}">${o.status}</span></td>
+                  <td>${new Date(o.created_at).toLocaleDateString('en-NG')}</td>
+                </tr>
+              `).join('') || '<tr><td colspan="5">No orders yet.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Top products</th><th>Sold</th></tr></thead>
+            <tbody>
+              ${data.topProducts.map(p => `<tr><td>${escapeHtml(p.name)}</td><td>${p.total_sold}</td></tr>`).join('') || '<tr><td colspan="2">No sales yet.</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    content.innerHTML = `<div class="empty-state"><h3>Couldn't load dashboard</h3><p>${escapeHtml(err.message)}</p></div>`;
+  }
+}
+document.addEventListener('DOMContentLoaded', loadDashboard);
+</script>
+</body>
+</html>

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inventory — NaijaMart Admin</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+<div class="admin-shell">
+  <aside class="admin-sidebar">
+    <div class="brand">Naija<span class="mart">Mart</span> Admin</div>
+    <nav class="admin-nav">
+      <a href="/admin/dashboard.html" data-page="dashboard">Dashboard</a>
+      <a href="/admin/products.html" data-page="products">Products</a>
+      <a href="/admin/inventory.html" data-page="inventory">Inventory</a>
+      <a href="/admin/orders.html" data-page="orders">Orders</a>
+      <a href="/index.html" data-page="">View storefront</a>
+    </nav>
+    <div class="admin-sidebar-foot">
+      Signed in as <span id="admin-user-name">Admin</span><br>
+      <a href="#" id="admin-logout">Log out</a>
+    </div>
+  </aside>
+
+  <div class="admin-main">
+    <div class="admin-topbar">
+      <h2 style="margin:0;">Inventory</h2>
+      <label style="font-size:0.85rem;font-weight:600;display:flex;align-items:center;gap:0.4rem;">
+        <input type="checkbox" id="low-stock-only"> Low stock only
+      </label>
+    </div>
+    <div class="admin-content">
+      <div class="table-wrap" id="inventory-table"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/admin.js"></script>
+<script>
+let inventory = [];
+
+async function loadInventory() {
+  if (!initAdminLayout('inventory')) return;
+  try {
+    const { inventory: rows } = await api.get('/inventory');
+    inventory = rows;
+    render();
+  } catch (err) {
+    document.getElementById('inventory-table').innerHTML = `<div class="empty-state"><p>${escapeHtml(err.message)}</p></div>`;
+  }
+}
+
+function render() {
+  const lowOnly = document.getElementById('low-stock-only').checked;
+  const rows = lowOnly ? inventory.filter(r => r.quantity_in_stock <= r.low_stock_threshold) : inventory;
+  const table = document.getElementById('inventory-table');
+
+  if (rows.length === 0) {
+    table.innerHTML = `<div class="empty-state"><h3>Nothing to show</h3></div>`;
+    return;
+  }
+
+  table.innerHTML = `
+    <table>
+      <thead><tr><th>Product</th><th>SKU</th><th>In stock</th><th>Low stock threshold</th><th>Update</th></tr></thead>
+      <tbody>
+        ${rows.map(r => `
+          <tr class="${r.quantity_in_stock <= r.low_stock_threshold ? '' : ''}">
+            <td>${escapeHtml(r.name)}</td>
+            <td>${escapeHtml(r.sku || '—')}</td>
+            <td>
+              ${r.quantity_in_stock <= r.low_stock_threshold ? `<span class="badge badge-cancelled">${r.quantity_in_stock} low</span>` : r.quantity_in_stock}
+            </td>
+            <td>${r.low_stock_threshold}</td>
+            <td style="display:flex;gap:0.4rem;">
+              <input type="number" min="0" value="${r.quantity_in_stock}" style="width:80px;padding:0.3rem 0.5rem;border:1.5px solid var(--line);border-radius:6px;" data-qty="${r.product_id}">
+              <button class="btn btn-outline btn-sm" data-save="${r.product_id}">Save</button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+
+  table.querySelectorAll('[data-save]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const productId = btn.dataset.save;
+      const input = table.querySelector(`[data-qty="${productId}"]`);
+      try {
+        await api.put(`/inventory/${productId}`, { quantity_in_stock: Number(input.value) });
+        showToast('Stock updated');
+        loadInventory();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    });
+  });
+}
+
+document.getElementById('low-stock-only').addEventListener('change', render);
+document.addEventListener('DOMContentLoaded', loadInventory);
+</script>
+</body>
+</html>

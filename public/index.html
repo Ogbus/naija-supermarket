@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NaijaMart — Everyday groceries, delivered</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="container">
+    <span>Delivering fresh groceries across Nigeria</span>
+    <span class="topbar-tag">Free delivery on orders over &#8358;20,000</span>
+  </div>
+</div>
+
+<header class="site-header">
+  <div class="container">
+    <a href="/index.html" class="brand">Naija<span class="mart">Mart</span></a>
+    <form id="search-form" class="search-form">
+      <input type="search" name="q" placeholder="Search rice, garri, oil, Maggi...">
+      <button type="submit" aria-label="Search">Search</button>
+    </form>
+    <div class="header-actions" id="auth-area"></div>
+    <a href="/cart.html" style="display:flex;align-items:center;gap:0.3rem;">
+      Cart <span class="cart-badge" id="cart-badge">0</span>
+    </a>
+    <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+  </div>
+  <nav class="nav-categories" id="nav-categories">
+    <div class="container" id="category-links"></div>
+  </nav>
+</header>
+
+<section class="hero">
+  <div class="container">
+    <span class="hero-tag">MARKET DAY, EVERY DAY</span>
+    <h1>Rice, garri, oil &amp; everything for the kitchen — at your door.</h1>
+    <p>Shop the same brands you trust from your local supermarket, delivered to your address anywhere in Nigeria.</p>
+    <a href="#shop" class="btn btn-amber">Start shopping</a>
+  </div>
+</section>
+
+<main class="container section" id="shop">
+  <div class="chip-row" id="chip-row">
+    <span class="chip active" data-slug="">All</span>
+  </div>
+
+  <div class="section-head">
+    <h2 id="grid-title">All products</h2>
+    <span id="result-count" style="font-size:0.85rem;color:var(--ink-soft);"></span>
+  </div>
+
+  <div id="product-grid" class="product-grid">
+    <div class="spinner"></div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div>
+        <h4>NaijaMart</h4>
+        <a href="/index.html">Shop</a>
+        <a href="/cart.html">Cart</a>
+        <a href="/account.html">My account</a>
+      </div>
+      <div>
+        <h4>Help</h4>
+        <a href="#">Delivery info</a>
+        <a href="#">Returns policy</a>
+        <a href="#">Contact us</a>
+      </div>
+      <div>
+        <h4>Company</h4>
+        <a href="#">About NaijaMart</a>
+        <a href="/login.html">Log in</a>
+      </div>
+    </div>
+    <div class="footer-bottom">&copy; 2026 NaijaMart. Fresh groceries, delivered.</div>
+  </div>
+</footer>
+
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/storefront.js"></script>
+</body>
+</html>

@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Checkout — NaijaMart</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="container"><span>Delivering fresh groceries across Nigeria</span><span class="topbar-tag">Secure checkout powered by Paystack</span></div></div>
+<header class="site-header">
+  <div class="container">
+    <a href="/index.html" class="brand">Naija<span class="mart">Mart</span></a>
+    <div style="flex:1;"></div>
+    <div class="header-actions" id="auth-area"></div>
+  </div>
+</header>
+
+<main class="container section" style="max-width:900px;">
+  <h1>Checkout</h1>
+  <div id="checkout-content"><div class="spinner"></div></div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-bottom">&copy; 2026 NaijaMart. Fresh groceries, delivered.</div>
+  </div>
+</footer>
+
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+const content = document.getElementById('checkout-content');
+
+async function init() {
+  if (!requireAuth('/login.html')) return;
+
+  const params = new URLSearchParams(window.location.search);
+  const reference = params.get('reference');
+
+  if (reference) {
+    await handlePaymentReturn(reference);
+  } else {
+    await showCheckoutForm();
+  }
+}
+
+async function handlePaymentReturn(reference) {
+  content.innerHTML = `<div class="empty-state"><div class="spinner"></div><p>Confirming your payment with Paystack...</p></div>`;
+  try {
+    const result = await api.get(`/payments/verify/${encodeURIComponent(reference)}`);
+    refreshCartBadge();
+    if (result.status === 'success') {
+      content.innerHTML = `
+        <div class="empty-state">
+          <h3>Payment successful 🎉</h3>
+          <p>Your order #${result.order.id} has been placed and is being processed.</p>
+          <a class="btn btn-primary" href="/account.html">View my orders</a>
+        </div>`;
+    } else {
+      content.innerHTML = `
+        <div class="empty-state">
+          <h3>Payment not completed</h3>
+          <p>${escapeHtml(result.message || 'The transaction was not successful.')}</p>
+          <a class="btn btn-outline" href="/cart.html">Back to cart</a>
+        </div>`;
+    }
+  } catch (err) {
+    content.innerHTML = `<div class="empty-state"><h3>Couldn't confirm payment</h3><p>${escapeHtml(err.message)}</p></div>`;
+  }
+}
+
+async function showCheckoutForm() {
+  try {
+    const [cartData, addressData] = await Promise.all([api.get('/cart'), api.get('/addresses')]);
+    if (cartData.items.length === 0) {
+      content.innerHTML = `<div class="empty-state"><h3>Your cart is empty</h3><a class="btn btn-primary" href="/index.html">Start shopping</a></div>`;
+      return;
+    }
+
+    renderForm(cartData, addressData.addresses);
+  } catch (err) {
+    content.innerHTML = `<div class="empty-state"><h3>Something went wrong</h3><p>${escapeHtml(err.message)}</p></div>`;
+  }
+}
+
+function renderForm(cartData, addresses) {
+  content.innerHTML = `
+    <div class="cart-layout">
+      <div>
+        <div class="form-card" style="max-width:none;margin:0;">
+          <h3>Delivery address</h3>
+          <div id="address-list">
+            ${addresses.length === 0 ? '<p style="color:var(--ink-soft);">No saved addresses yet. Add one below.</p>' :
+              addresses.map(a => `
+                <label style="display:flex;gap:0.6rem;align-items:flex-start;padding:0.7rem 0;border-bottom:1px solid var(--line);">
+                  <input type="radio" name="address" value="${a.id}" ${a.is_default ? 'checked' : ''} style="margin-top:0.3rem;">
+                  <span><strong>${escapeHtml(a.label)}</strong><br>${escapeHtml(a.street)}, ${escapeHtml(a.city)}, ${escapeHtml(a.state)}<br><span style="color:var(--ink-soft);">${escapeHtml(a.phone)}</span></span>
+                </label>
+              `).join('')}
+          </div>
+          <button type="button" class="btn btn-outline btn-sm" id="toggle-new-address" style="margin-top:0.8rem;">+ Add new address</button>
+
+          <form id="new-address-form" style="display:none;margin-top:1rem;">
+            <div class="field"><label>Label</label><input name="label" placeholder="Home, Office..." value="Home"></div>
+            <div class="field"><label>Street address</label><input name="street" required></div>
+            <div class="field"><label>City</label><input name="city" required></div>
+            <div class="field"><label>State</label><input name="state" required></div>
+            <div class="field"><label>Phone number</label><input name="phone" required></div>
+            <button type="submit" class="btn btn-primary btn-sm">Save address</button>
+          </form>
+        </div>
+      </div>
+      <div class="summary-card">
+        <span class="receipt-tag">ORDER SUMMARY</span>
+        ${cartData.items.map(i => `<div class="summary-row"><span>${escapeHtml(i.name)} &times; ${i.quantity}</span><span class="price">${(i.price * i.quantity).toLocaleString('en-NG')}</span></div>`).join('')}
+        <div class="summary-row total"><span>Total</span><span class="price">${cartData.subtotal.toLocaleString('en-NG')}</span></div>
+        <div class="form-msg" id="checkout-msg"></div>
+        <button type="button" class="btn btn-primary btn-block" id="pay-btn" style="margin-top:1rem;">Pay with Paystack</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('toggle-new-address').addEventListener('click', () => {
+    const form = document.getElementById('new-address-form');
+    form.style.display = form.style.display === 'none' ? 'block' : 'none';
+  });
+
+  document.getElementById('new-address-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    try {
+      await api.post('/addresses', {
+        label: fd.get('label'), street: fd.get('street'), city: fd.get('city'),
+        state: fd.get('state'), phone: fd.get('phone'), is_default: addresses.length === 0,
+      });
+      showCheckoutForm();
+    } catch (err) {
+      showToast(err.message, true);
+    }
+  });
+
+  document.getElementById('pay-btn').addEventListener('click', startPayment);
+}
+
+async function startPayment() {
+  const msg = document.getElementById('checkout-msg');
+  const selected = document.querySelector('input[name="address"]:checked');
+  if (!selected) {
+    msg.className = 'form-msg error';
+    msg.textContent = 'Please select or add a delivery address.';
+    return;
+  }
+
+  const payBtn = document.getElementById('pay-btn');
+  payBtn.disabled = true;
+  payBtn.textContent = 'Processing...';
+
+  try {
+    const { order } = await api.post('/orders', { address_id: Number(selected.value) });
+    const { authorization_url } = await api.post('/payments/initialize', { order_id: order.id });
+    window.location.href = authorization_url; // hand off to Paystack's hosted checkout page
+  } catch (err) {
+    msg.className = 'form-msg error';
+    msg.textContent = err.message;
+    payBtn.disabled = false;
+    payBtn.textContent = 'Pay with Paystack';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

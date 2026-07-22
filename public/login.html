@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Log in — NaijaMart</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body style="background:var(--green-900);min-height:100vh;">
+
+<div class="container" style="padding-top:2rem;">
+  <a href="/index.html" class="brand" style="color:#fff;"><span style="color:#fff;">Naija</span><span class="mart" style="color:var(--amber-500);">Mart</span></a>
+</div>
+
+<div class="form-card">
+  <h1>Welcome back</h1>
+  <p style="color:var(--ink-soft);margin-top:-0.6rem;margin-bottom:1.2rem;">Log in to continue shopping.</p>
+  <div class="form-msg" id="msg"></div>
+  <form id="login-form">
+    <div class="field"><label>Email address</label><input type="email" name="email" required></div>
+    <div class="field"><label>Password</label><input type="password" name="password" required></div>
+    <button type="submit" class="btn btn-primary btn-block" id="submit-btn">Log in</button>
+  </form>
+  <div class="form-foot">Don't have an account? <a href="/register.html">Create one</a></div>
+</div>
+
+<script src="/js/api.js"></script>
+<script>
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('msg');
+  const btn = document.getElementById('submit-btn');
+  const fd = new FormData(e.target);
+
+  btn.disabled = true;
+  btn.textContent = 'Logging in...';
+  msg.className = 'form-msg';
+
+  try {
+    const data = await api.post('/auth/login', { email: fd.get('email'), password: fd.get('password') });
+    setAccessToken(data.accessToken);
+    setStoredUser(data.user);
+
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get('next');
+    if (data.user.role === 'admin' && !next) {
+      window.location.href = '/admin/dashboard.html';
+    } else {
+      window.location.href = next || '/index.html';
+    }
+  } catch (err) {
+    msg.className = 'form-msg error';
+    msg.textContent = err.message;
+    btn.disabled = false;
+    btn.textContent = 'Log in';
+  }
+});
+</script>
+</body>
+</html>

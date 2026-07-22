@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orders — NaijaMart Admin</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+<div class="admin-shell">
+  <aside class="admin-sidebar">
+    <div class="brand">Naija<span class="mart">Mart</span> Admin</div>
+    <nav class="admin-nav">
+      <a href="/admin/dashboard.html" data-page="dashboard">Dashboard</a>
+      <a href="/admin/products.html" data-page="products">Products</a>
+      <a href="/admin/inventory.html" data-page="inventory">Inventory</a>
+      <a href="/admin/orders.html" data-page="orders">Orders</a>
+      <a href="/index.html" data-page="">View storefront</a>
+    </nav>
+    <div class="admin-sidebar-foot">
+      Signed in as <span id="admin-user-name">Admin</span><br>
+      <a href="#" id="admin-logout">Log out</a>
+    </div>
+  </aside>
+
+  <div class="admin-main">
+    <div class="admin-topbar"><h2 style="margin:0;">Orders</h2></div>
+    <div class="admin-content">
+      <div class="admin-toolbar">
+        <select id="status-filter">
+          <option value="">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="paid">Paid</option>
+          <option value="processing">Processing</option>
+          <option value="shipped">Shipped</option>
+          <option value="delivered">Delivered</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+      <div class="table-wrap" id="orders-table"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/admin.js"></script>
+<script>
+const STATUSES = ['pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled'];
+
+async function loadOrders() {
+  if (!initAdminLayout('orders')) return;
+  const status = document.getElementById('status-filter').value;
+  const table = document.getElementById('orders-table');
+
+  try {
+    const { orders } = await api.get(`/orders/all${status ? '?status=' + status : ''}`);
+    if (orders.length === 0) {
+      table.innerHTML = `<div class="empty-state"><h3>No orders found</h3></div>`;
+      return;
+    }
+    table.innerHTML = `
+      <table>
+        <thead><tr><th>Order</th><th>Customer</th><th>Email</th><th>Total</th><th>Status</th><th>Date</th></tr></thead>
+        <tbody>
+          ${orders.map(o => `
+            <tr>
+              <td>#${o.id}</td>
+              <td>${escapeHtml(o.customer_name)}</td>
+              <td>${escapeHtml(o.customer_email)}</td>
+              <td class="price">${o.total_amount.toLocaleString('en-NG')}</td>
+              <td>
+                <select class="status-select" data-order="${o.id}">
+                  ${STATUSES.map(s => `<option value="${s}" ${s === o.status ? 'selected' : ''}>${s}</option>`).join('')}
+                </select>
+              </td>
+              <td>${new Date(o.created_at).toLocaleDateString('en-NG')}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+    table.querySelectorAll('.status-select').forEach(sel => {
+      sel.addEventListener('change', async () => {
+        try {
+          await api.put(`/orders/${sel.dataset.order}/status`, { status: sel.value });
+          showToast(`Order #${sel.dataset.order} updated`);
+        } catch (err) {
+          showToast(err.message, true);
+          loadOrders();
+        }
+      });
+    });
+  } catch (err) {
+    table.innerHTML = `<div class="empty-state"><p>${escapeHtml(err.message)}</p></div>`;
+  }
+}
+
+document.getElementById('status-filter').addEventListener('change', loadOrders);
+document.addEventListener('DOMContentLoaded', loadOrders);
+</script>
+</body>
+</html>

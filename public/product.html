@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Product — NaijaMart</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="container"><span>Delivering fresh groceries across Nigeria</span><span class="topbar-tag">Free delivery on orders over &#8358;20,000</span></div></div>
+<header class="site-header">
+  <div class="container">
+    <a href="/index.html" class="brand">Naija<span class="mart">Mart</span></a>
+    <form id="search-form" class="search-form">
+      <input type="search" name="q" placeholder="Search rice, garri, oil, Maggi...">
+      <button type="submit">Search</button>
+    </form>
+    <div class="header-actions" id="auth-area"></div>
+    <a href="/cart.html" style="display:flex;align-items:center;gap:0.3rem;">Cart <span class="cart-badge" id="cart-badge">0</span></a>
+    <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+  </div>
+  <nav class="nav-categories" id="nav-categories"><div class="container" id="category-links"></div></nav>
+</header>
+
+<main class="container section">
+  <a href="/index.html" style="font-size:0.85rem;">&larr; Back to shop</a>
+  <div id="product-detail" style="margin-top:1.2rem;">
+    <div class="spinner"></div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div><h4>NaijaMart</h4><a href="/index.html">Shop</a><a href="/cart.html">Cart</a><a href="/account.html">My account</a></div>
+      <div><h4>Help</h4><a href="#">Delivery info</a><a href="#">Returns policy</a><a href="#">Contact us</a></div>
+      <div><h4>Company</h4><a href="#">About NaijaMart</a><a href="/login.html">Log in</a></div>
+    </div>
+    <div class="footer-bottom">&copy; 2026 NaijaMart. Fresh groceries, delivered.</div>
+  </div>
+</footer>
+
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+async function loadProduct() {
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('id');
+  const container = document.getElementById('product-detail');
+  if (!id) { container.innerHTML = '<p>Product not found.</p>'; return; }
+
+  try {
+    const { product } = await api.get(`/products/${id}`);
+    document.title = `${product.name} — NaijaMart`;
+    const outOfStock = product.quantity_in_stock <= 0;
+
+    container.innerHTML = `
+      <div style="display:grid;grid-template-columns:minmax(0,340px) 1fr;gap:2.2rem;align-items:start;">
+        <div class="product-thumb" style="border-radius:var(--radius-lg);border:1px solid var(--line);">
+          <img src="${product.image_url || '/images/placeholder.svg'}" alt="${escapeHtml(product.name)}">
+        </div>
+        <div>
+          <div class="product-cat">${escapeHtml(product.category_name || '')}</div>
+          <h1 style="margin:0.3rem 0 0.6rem;">${escapeHtml(product.name)}</h1>
+          <p style="color:var(--ink-soft);">${escapeHtml(product.description || '')}</p>
+          <div class="price" style="font-size:1.8rem;margin:1rem 0 0.3rem;">${Number(product.price).toLocaleString('en-NG')}</div>
+          <div class="product-unit" style="margin-bottom:1rem;">Per ${escapeHtml(product.unit)}</div>
+          <span class="stock-tag ${outOfStock ? 'out' : ''}" style="position:static;display:inline-block;margin-bottom:1.2rem;">
+            ${outOfStock ? 'Out of stock' : `${product.quantity_in_stock} in stock`}
+          </span>
+          <div style="display:flex;gap:0.8rem;align-items:center;">
+            <div class="qty-control">
+              <button type="button" id="qty-minus">-</button>
+              <input type="number" id="qty-input" value="1" min="1" max="${product.quantity_in_stock}">
+              <button type="button" id="qty-plus">+</button>
+            </div>
+            <button class="btn btn-primary" id="add-to-cart-btn" ${outOfStock ? 'disabled' : ''}>Add to cart</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('qty-minus').addEventListener('click', () => {
+      const input = document.getElementById('qty-input');
+      input.value = Math.max(1, Number(input.value) - 1);
+    });
+    document.getElementById('qty-plus').addEventListener('click', () => {
+      const input = document.getElementById('qty-input');
+      input.value = Math.min(product.quantity_in_stock, Number(input.value) + 1);
+    });
+    document.getElementById('add-to-cart-btn').addEventListener('click', async () => {
+      if (!getAccessToken()) {
+        window.location.href = `/login.html?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+        return;
+      }
+      const qty = Number(document.getElementById('qty-input').value) || 1;
+      try {
+        await api.post('/cart', { product_id: product.id, quantity: qty });
+        showToast('Added to cart');
+        refreshCartBadge();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    });
+  } catch (err) {
+    container.innerHTML = `<div class="empty-state"><h3>Product not found</h3><p>${escapeHtml(err.message)}</p></div>`;
+  }
+}
+document.addEventListener('DOMContentLoaded', loadProduct);
+</script>
+</body>
+</html>

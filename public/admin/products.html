@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manage Products — NaijaMart Admin</title>
+<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+<div class="admin-shell">
+  <aside class="admin-sidebar">
+    <div class="brand">Naija<span class="mart">Mart</span> Admin</div>
+    <nav class="admin-nav">
+      <a href="/admin/dashboard.html" data-page="dashboard">Dashboard</a>
+      <a href="/admin/products.html" data-page="products">Products</a>
+      <a href="/admin/inventory.html" data-page="inventory">Inventory</a>
+      <a href="/admin/orders.html" data-page="orders">Orders</a>
+      <a href="/index.html" data-page="">View storefront</a>
+    </nav>
+    <div class="admin-sidebar-foot">
+      Signed in as <span id="admin-user-name">Admin</span><br>
+      <a href="#" id="admin-logout">Log out</a>
+    </div>
+  </aside>
+
+  <div class="admin-main">
+    <div class="admin-topbar">
+      <h2 style="margin:0;">Products</h2>
+      <button class="btn btn-primary btn-sm" id="new-product-btn">+ New product</button>
+    </div>
+    <div class="admin-content">
+      <div class="admin-toolbar">
+        <input type="search" id="product-search" placeholder="Search products...">
+      </div>
+      <div class="table-wrap" id="products-table"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="product-modal">
+  <div class="modal">
+    <h3 id="modal-title">New product</h3>
+    <div class="form-msg" id="modal-msg"></div>
+    <form id="product-form">
+      <input type="hidden" name="id">
+      <div class="field"><label>Name</label><input name="name" required></div>
+      <div class="field"><label>Category</label><select name="category_id" id="category-select"></select></div>
+      <div class="field"><label>Description</label><textarea name="description" rows="2"></textarea></div>
+      <div class="field"><label>Price (&#8358;)</label><input type="number" name="price" min="0" step="0.01" required></div>
+      <div class="field"><label>Unit (e.g. 5kg, bottle, pack)</label><input name="unit" value="unit"></div>
+      <div class="field"><label>SKU</label><input name="sku"></div>
+      <div class="field">
+        <label>Product image</label>
+        <div style="display:flex;gap:0.8rem;align-items:center;">
+          <div class="product-thumb" id="image-preview" style="width:64px;height:64px;flex-shrink:0;border-radius:8px;">
+            <img id="image-preview-img" src="/images/placeholder.svg" alt="">
+          </div>
+          <div style="flex:1;">
+            <input type="file" id="image-file-input" accept="image/png,image/jpeg,image/webp,image/gif">
+            <div style="font-size:0.76rem;color:var(--ink-soft);margin-top:0.3rem;">JPEG, PNG, WEBP or GIF, up to 5MB. Uploads immediately and fills the URL below.</div>
+          </div>
+        </div>
+        <input type="hidden" name="image_url" id="image-url-input">
+        <div id="upload-status" style="font-size:0.8rem;margin-top:0.3rem;"></div>
+      </div>
+      <div class="field" id="stock-field"><label>Initial stock</label><input type="number" name="initial_stock" min="0" value="0"></div>
+      <div style="display:flex;gap:0.6rem;justify-content:flex-end;margin-top:1rem;">
+        <button type="button" class="btn btn-outline btn-sm" id="modal-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm">Save product</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/admin.js"></script>
+<script>
+let categories = [];
+let allProducts = [];
+
+async function loadProducts() {
+  if (!initAdminLayout('products')) return;
+  const table = document.getElementById('products-table');
+
+  try {
+    const [{ categories: cats }, { products }] = await Promise.all([
+      api.get('/products/categories/all'), api.get('/products'),
+    ]);
+    categories = cats;
+    allProducts = products;
+    document.getElementById('category-select').innerHTML = categories.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+    renderTable(products);
+  } catch (err) {
+    table.innerHTML = `<div class="empty-state"><p>${escapeHtml(err.message)}</p></div>`;
+  }
+}
+
+function renderTable(products) {
+  const table = document.getElementById('products-table');
+  if (products.length === 0) {
+    table.innerHTML = `<div class="empty-state"><h3>No products found</h3></div>`;
+    return;
+  }
+  table.innerHTML = `
+    <table>
+      <thead><tr><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        ${products.map(p => `
+          <tr>
+            <td>${escapeHtml(p.name)}</td>
+            <td>${escapeHtml(p.category_name || '—')}</td>
+            <td class="price">${p.price.toLocaleString('en-NG')}</td>
+            <td>${p.quantity_in_stock}</td>
+            <td>${p.is_active ? '<span class="badge badge-paid">Active</span>' : '<span class="badge badge-cancelled">Inactive</span>'}</td>
+            <td>
+              <button class="btn btn-outline btn-sm" data-edit="${p.id}">Edit</button>
+              <button class="btn btn-danger btn-sm" data-deactivate="${p.id}">Deactivate</button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+  table.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openModal(b.dataset.edit)));
+  table.querySelectorAll('[data-deactivate]').forEach(b => b.addEventListener('click', () => deactivateProduct(b.dataset.deactivate)));
+}
+
+document.getElementById('product-search').addEventListener('input', (e) => {
+  const q = e.target.value.toLowerCase();
+  renderTable(allProducts.filter(p => p.name.toLowerCase().includes(q)));
+});
+
+function openModal(productId) {
+  const modal = document.getElementById('product-modal');
+  const form = document.getElementById('product-form');
+  const msg = document.getElementById('modal-msg');
+  msg.className = 'form-msg';
+  form.reset();
+  document.getElementById('upload-status').textContent = '';
+  document.getElementById('image-file-input').value = '';
+
+  const stockField = document.getElementById('stock-field');
+  const previewImg = document.getElementById('image-preview-img');
+
+  if (productId) {
+    const p = allProducts.find(x => String(x.id) === String(productId));
+    document.getElementById('modal-title').textContent = 'Edit product';
+    form.id.value = p.id;
+    form.name.value = p.name;
+    form.category_id.value = p.category_id || '';
+    form.description.value = p.description || '';
+    form.price.value = p.price;
+    form.unit.value = p.unit;
+    form.sku.value = p.sku || '';
+    document.getElementById('image-url-input').value = p.image_url || '';
+    previewImg.src = p.image_url || '/images/placeholder.svg';
+    stockField.style.display = 'none';
+  } else {
+    document.getElementById('modal-title').textContent = 'New product';
+    document.getElementById('image-url-input').value = '';
+    previewImg.src = '/images/placeholder.svg';
+    stockField.style.display = 'block';
+  }
+  modal.classList.add('open');
+}
+
+document.getElementById('image-file-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const status = document.getElementById('upload-status');
+  const previewImg = document.getElementById('image-preview-img');
+  const productId = document.querySelector('#product-form input[name="id"]').value;
+
+  status.textContent = 'Uploading...';
+  status.style.color = 'var(--ink-soft)';
+
+  const formData = new FormData();
+  formData.append('image', file);
+  if (productId) formData.append('product_id', productId);
+
+  try {
+    const { image_url } = await api.upload('/products/upload-image', formData);
+    document.getElementById('image-url-input').value = image_url;
+    previewImg.src = image_url;
+    status.textContent = 'Image uploaded.';
+    status.style.color = 'var(--green-700)';
+  } catch (err) {
+    status.textContent = err.message;
+    status.style.color = 'var(--danger)';
+  }
+});
+
+document.getElementById('new-product-btn').addEventListener('click', () => openModal(null));
+document.getElementById('modal-cancel').addEventListener('click', () => document.getElementById('product-modal').classList.remove('open'));
+
+document.getElementById('product-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('modal-msg');
+  const fd = new FormData(e.target);
+  const payload = {
+    name: fd.get('name'),
+    category_id: fd.get('category_id') ? Number(fd.get('category_id')) : null,
+    description: fd.get('description'),
+    price: Number(fd.get('price')),
+    unit: fd.get('unit'),
+    sku: fd.get('sku') || null,
+    image_url: fd.get('image_url') || undefined,
+  };
+  const id = fd.get('id');
+  if (!id) payload.initial_stock = Number(fd.get('initial_stock')) || 0;
+
+  try {
+    if (id) await api.put(`/products/${id}`, payload);
+    else await api.post('/products', payload);
+    document.getElementById('product-modal').classList.remove('open');
+    loadProducts();
+  } catch (err) {
+    msg.className = 'form-msg error';
+    msg.textContent = err.message;
+  }
+});
+
+async function deactivateProduct(id) {
+  if (!confirm('Deactivate this product? It will no longer appear on the storefront.')) return;
+  try {
+    await api.del(`/products/${id}`);
+    loadProducts();
+  } catch (err) {
+    showToast(err.message, true);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadProducts);
+</script>
+</body>
+</html>

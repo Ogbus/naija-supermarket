@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Account — NaijaMart</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="container"><span>Delivering fresh groceries across Nigeria</span><span class="topbar-tag">Free delivery on orders over &#8358;20,000</span></div></div>
+<header class="site-header">
+  <div class="container">
+    <a href="/index.html" class="brand">Naija<span class="mart">Mart</span></a>
+    <div style="flex:1;"></div>
+    <div class="header-actions" id="auth-area"></div>
+    <a href="/cart.html" style="display:flex;align-items:center;gap:0.3rem;">Cart <span class="cart-badge" id="cart-badge">0</span></a>
+  </div>
+</header>
+
+<main class="container section">
+  <h1>My account</h1>
+  <div id="account-info" style="margin-bottom:2rem;color:var(--ink-soft);"></div>
+
+  <h2>Order history</h2>
+  <div id="orders-content"><div class="spinner"></div></div>
+</main>
+
+<footer class="site-footer">
+  <div class="container"><div class="footer-bottom">&copy; 2026 NaijaMart. Fresh groceries, delivered.</div></div>
+</footer>
+
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+async function init() {
+  if (!requireAuth('/login.html')) return;
+
+  try {
+    const { user } = await api.get('/auth/me');
+    setStoredUser(user);
+    document.getElementById('account-info').innerHTML = `${escapeHtml(user.name)} &middot; ${escapeHtml(user.email)}${user.phone ? ' &middot; ' + escapeHtml(user.phone) : ''}`;
+  } catch { /* keep going, orders can still load */ }
+
+  const content = document.getElementById('orders-content');
+  try {
+    const { orders } = await api.get('/orders/my-orders');
+    if (orders.length === 0) {
+      content.innerHTML = `<div class="empty-state"><h3>No orders yet</h3><a class="btn btn-primary" href="/index.html">Start shopping</a></div>`;
+      return;
+    }
+    content.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Order</th><th>Date</th><th>Items</th><th>Total</th><th>Status</th></tr></thead>
+          <tbody>
+            ${orders.map(o => `
+              <tr>
+                <td>#${o.id}</td>
+                <td>${new Date(o.created_at).toLocaleDateString('en-NG', { year: 'numeric', month: 'short', day: 'numeric' })}</td>
+                <td><a href="#" data-order="${o.id}" class="view-order">View details</a></td>
+                <td class="price">${o.total_amount.toLocaleString('en-NG')}</td>
+                <td><span class="badge badge-${o.status}">${o.status}</span></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div id="order-detail" style="margin-top:1.5rem;"></div>
+    `;
+    content.querySelectorAll('.view-order').forEach(link => {
+      link.addEventListener('click', (e) => { e.preventDefault(); showOrderDetail(link.dataset.order); });
+    });
+  } catch (err) {
+    content.innerHTML = `<div class="empty-state"><h3>Couldn't load orders</h3><p>${escapeHtml(err.message)}</p></div>`;
+  }
+}
+
+async function showOrderDetail(orderId) {
+  const detail = document.getElementById('order-detail');
+  detail.innerHTML = '<div class="spinner"></div>';
+  try {
+    const { order, items } = await api.get(`/orders/${orderId}`);
+    detail.innerHTML = `
+      <div class="form-card" style="max-width:none;margin:0;">
+        <h3>Order #${order.id} <span class="badge badge-${order.status}">${order.status}</span></h3>
+        <div class="table-wrap" style="margin-top:1rem;">
+          <table>
+            <thead><tr><th>Product</th><th>Qty</th><th>Unit price</th><th>Total</th></tr></thead>
+            <tbody>
+              ${items.map(i => `<tr><td>${escapeHtml(i.product_name)}</td><td>${i.quantity}</td><td class="price">${i.unit_price.toLocaleString('en-NG')}</td><td class="price">${(i.unit_price * i.quantity).toLocaleString('en-NG')}</td></tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } catch (err) {
+    detail.innerHTML = `<p>${escapeHtml(err.message)}</p>`;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your Cart — NaijaMart</title>
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<div class="topbar"><div class="container"><span>Delivering fresh groceries across Nigeria</span><span class="topbar-tag">Free delivery on orders over &#8358;20,000</span></div></div>
+<header class="site-header">
+  <div class="container">
+    <a href="/index.html" class="brand">Naija<span class="mart">Mart</span></a>
+    <form id="search-form" class="search-form">
+      <input type="search" name="q" placeholder="Search rice, garri, oil, Maggi...">
+      <button type="submit">Search</button>
+    </form>
+    <div class="header-actions" id="auth-area"></div>
+    <a href="/cart.html" style="display:flex;align-items:center;gap:0.3rem;">Cart <span class="cart-badge" id="cart-badge">0</span></a>
+    <button class="nav-toggle" id="nav-toggle" aria-label="Toggle menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+  </div>
+  <nav class="nav-categories" id="nav-categories"><div class="container" id="category-links"></div></nav>
+</header>
+
+<main class="container section">
+  <h1>Your cart</h1>
+  <div id="cart-content"><div class="spinner"></div></div>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div><h4>NaijaMart</h4><a href="/index.html">Shop</a><a href="/cart.html">Cart</a><a href="/account.html">My account</a></div>
+      <div><h4>Help</h4><a href="#">Delivery info</a><a href="#">Returns policy</a><a href="#">Contact us</a></div>
+      <div><h4>Company</h4><a href="#">About NaijaMart</a><a href="/login.html">Log in</a></div>
+    </div>
+    <div class="footer-bottom">&copy; 2026 NaijaMart. Fresh groceries, delivered.</div>
+  </div>
+</footer>
+
+<script src="/js/api.js"></script>
+<script src="/js/layout.js"></script>
+<script>
+async function loadCart() {
+  const content = document.getElementById('cart-content');
+
+  if (!getAccessToken()) {
+    content.innerHTML = `<div class="empty-state">
+      <h3>Log in to view your cart</h3>
+      <p>Your cart is saved to your account so you can pick up where you left off.</p>
+      <a class="btn btn-primary" href="/login.html?next=/cart.html">Log in</a>
+    </div>`;
+    return;
+  }
+
+  try {
+    const { items, subtotal } = await api.get('/cart');
+    if (items.length === 0) {
+      content.innerHTML = `<div class="empty-state">
+        <h3>Your cart is empty</h3>
+        <p>Browse the shop and add items you need.</p>
+        <a class="btn btn-primary" href="/index.html">Start shopping</a>
+      </div>`;
+      return;
+    }
+
+    content.innerHTML = `
+      <div class="cart-layout">
+        <div>
+          <div class="table-wrap" style="padding:0 1.2rem;">
+            ${items.map(itemHtml).join('')}
+          </div>
+        </div>
+        <div class="summary-card">
+          <span class="receipt-tag">ORDER SUMMARY</span>
+          <div class="summary-row"><span>Subtotal</span><span class="price">${subtotal.toLocaleString('en-NG')}</span></div>
+          <div class="summary-row"><span>Delivery</span><span>${subtotal >= 20000 ? 'Free' : 'Calculated at checkout'}</span></div>
+          <div class="summary-row total"><span>Total</span><span class="price">${subtotal.toLocaleString('en-NG')}</span></div>
+          <a href="/checkout.html" class="btn btn-primary btn-block" style="margin-top:1rem;">Proceed to checkout</a>
+        </div>
+      </div>
+    `;
+
+    content.querySelectorAll('[data-action="inc"]').forEach(b => b.addEventListener('click', () => changeQty(b.dataset.id, 1)));
+    content.querySelectorAll('[data-action="dec"]').forEach(b => b.addEventListener('click', () => changeQty(b.dataset.id, -1)));
+    content.querySelectorAll('[data-action="remove"]').forEach(b => b.addEventListener('click', () => removeItem(b.dataset.id)));
+  } catch (err) {
+    content.innerHTML = `<div class="empty-state"><h3>Couldn't load cart</h3><p>${escapeHtml(err.message)}</p></div>`;
+  }
+}
+
+function itemHtml(item) {
+  return `
+    <div class="cart-item">
+      <div class="cart-item-thumb"><img src="${item.image_url || '/images/placeholder.svg'}" alt=""></div>
+      <div>
+        <div class="cart-item-name">${escapeHtml(item.name)}</div>
+        <div class="cart-item-unit">Per ${escapeHtml(item.unit)} &middot; ${item.price.toLocaleString('en-NG')} each</div>
+      </div>
+      <div class="qty-control">
+        <button type="button" data-action="dec" data-id="${item.cart_item_id}">-</button>
+        <input type="text" value="${item.quantity}" readonly>
+        <button type="button" data-action="inc" data-id="${item.cart_item_id}">+</button>
+      </div>
+      <div style="text-align:right;">
+        <div class="price">${(item.price * item.quantity).toLocaleString('en-NG')}</div>
+        <span class="remove-link" data-action="remove" data-id="${item.cart_item_id}">Remove</span>
+      </div>
+    </div>
+  `;
+}
+
+async function changeQty(itemId, delta) {
+  try {
+    const { items } = await api.get('/cart');
+    const item = items.find(i => String(i.cart_item_id) === String(itemId));
+    if (!item) return;
+    const newQty = item.quantity + delta;
+    await api.put(`/cart/${itemId}`, { quantity: newQty });
+    loadCart();
+    refreshCartBadge();
+  } catch (err) {
+    showToast(err.message, true);
+  }
+}
+
+async function removeItem(itemId) {
+  try {
+    await api.del(`/cart/${itemId}`);
+    loadCart();
+    refreshCartBadge();
+  } catch (err) {
+    showToast(err.message, true);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadCart);
+</script>
+</body>
+</html>
