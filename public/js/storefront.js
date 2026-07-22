@@ -14,6 +14,7 @@ function productCardHtml(p) {
           <div class="product-name">${escapeHtml(p.name)}</div>
         </a>
         <div class="product-unit">Per ${escapeHtml(p.unit)}</div>
+        ${p.review_count > 0 ? `<div class="rating-line">${starsHtml(p.average_rating)} <span>(${p.review_count})</span></div>` : ''}
         <div class="product-price-row">
           <span class="price">${Number(p.price).toLocaleString('en-NG')}</span>
           <button class="add-btn" data-id="${p.id}" ${outOfStock ? 'disabled' : ''} title="Add to cart">+</button>

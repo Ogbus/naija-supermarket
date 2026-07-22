@@ -139,6 +139,16 @@ function showToast(message, isError = false) {
   toast._timer = setTimeout(() => toast.classList.remove('show'), 2800);
 }
 
+function starsHtml(rating, filledClass = 'filled') {
+  const rounded = Math.round(Number(rating) || 0);
+  let html = '<span class="stars">';
+  for (let i = 1; i <= 5; i++) {
+    html += `<span class="star ${i <= rounded ? filledClass : ''}">\u2605</span>`;
+  }
+  html += '</span>';
+  return html;
+}
+
 function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str == null ? '' : String(str);

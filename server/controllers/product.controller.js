@@ -4,7 +4,9 @@ function listProducts(req, res) {
   const { category, search } = req.query;
   let query = `
     SELECT p.*, c.name AS category_name, c.slug AS category_slug,
-           COALESCE(i.quantity_in_stock, 0) AS quantity_in_stock
+           COALESCE(i.quantity_in_stock, 0) AS quantity_in_stock,
+           COALESCE(ROUND((SELECT AVG(rating) FROM reviews WHERE product_id = p.id), 1), 0) AS average_rating,
+           (SELECT COUNT(*) FROM reviews WHERE product_id = p.id) AS review_count
     FROM products p
     LEFT JOIN categories c ON c.id = p.category_id
     LEFT JOIN inventory i ON i.product_id = p.id
@@ -29,7 +31,9 @@ function listProducts(req, res) {
 function getProduct(req, res) {
   const product = db.prepare(`
     SELECT p.*, c.name AS category_name, c.slug AS category_slug,
-           COALESCE(i.quantity_in_stock, 0) AS quantity_in_stock
+           COALESCE(i.quantity_in_stock, 0) AS quantity_in_stock,
+           COALESCE(ROUND((SELECT AVG(rating) FROM reviews WHERE product_id = p.id), 1), 0) AS average_rating,
+           (SELECT COUNT(*) FROM reviews WHERE product_id = p.id) AS review_count
     FROM products p
     LEFT JOIN categories c ON c.id = p.category_id
     LEFT JOIN inventory i ON i.product_id = p.id
