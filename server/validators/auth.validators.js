@@ -1,4 +1,5 @@
 const { body } = require('express-validator');
+const { isValidNigerianPhone } = require('../utils/phone');
 
 const registerRules = [
   body('name').trim().notEmpty().withMessage('Name is required.')
@@ -6,8 +7,8 @@ const registerRules = [
   body('email').trim().isEmail().withMessage('A valid email address is required.').normalizeEmail(),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters.'),
   body('phone').optional({ checkFalsy: true }).trim()
-    .isLength({ min: 7, max: 20 }).withMessage('Phone number looks invalid.')
-    .matches(/^[0-9+()\-\s]+$/).withMessage('Phone number contains invalid characters.'),
+    .custom((value) => isValidNigerianPhone(value))
+    .withMessage('Enter a valid Nigerian phone number, e.g. 08012345678 or +2348012345678.'),
 ];
 
 const loginRules = [
